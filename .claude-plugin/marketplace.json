@@ -1,0 +1,13 @@
+{
+  "name": "auto-worklog",
+  "owner": {
+    "name": "auto-worklog contributors"
+  },
+  "plugins": [
+    {
+      "name": "auto-worklog",
+      "source": "./",
+      "description": "Daily work log from your Claude Code and Codex sessions."
+    }
+  ]
+}

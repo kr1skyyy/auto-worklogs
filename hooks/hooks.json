@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/worklog.py\" hook || python \"${CLAUDE_PLUGIN_ROOT}/worklog.py\" hook",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

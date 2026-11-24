@@ -1,0 +1,19 @@
+{
+  "name": "auto-worklog",
+  "version": "0.1.0",
+  "description": "Writes a daily work log (hours + one line per task) from your Claude Code, Codex and Cursor (not tested) sessions. Runs hidden at startup, Monday to Friday, after 19:00.",
+  "author": {
+    "name": "auto-worklog contributors"
+  },
+  "license": "MIT",
+  "keywords": [
+    "worklog",
+    "timesheet",
+    "time-tracking",
+    "codex",
+    "productivity",
+    "cursor"
+  ],
+  "homepage": "https://github.com/kr1skyyy/auto-worklogs",
+  "repository": "https://github.com/kr1skyyy/auto-worklogs"
+}
