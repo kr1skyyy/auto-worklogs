@@ -30,8 +30,8 @@ python3 auto-worklogs/worklog.py install      # Windows: python
 ```
 
 It asks which tools you use: **Claude Code, Codex, Cursor** (pick one or more). Then it:
-- adds the Claude Code plugin (startup hook + `/worklog` command + `worklog` and `worklog-api` skills),
-- adds a startup hook and the skills to `~/.codex` (a backup of `hooks.json` is kept). Codex needs `hooks = true` under `[features]` in `~/.codex/config.toml`,
+- adds the Claude Code plugin (startup hook + `/worklog` command + `worklog` skill),
+- adds a startup hook and the `worklog` skill to `~/.codex` (a backup of `hooks.json` is kept). Codex needs `hooks = true` under `[features]` in `~/.codex/config.toml`,
 - adds a `sessionStart` hook to `~/.cursor/hooks.json` (a backup is kept).
 
 Without questions: `install --tools claude,codex,cursor` (or `both`, `all`).
@@ -53,6 +53,11 @@ Claude Code only, from inside Claude Code:
 | A week with total hours | `python3 worklog.py week [YYYY-MM-DD]` |
 | Build a day now | `python3 worklog.py day today` |
 | Add a manual line | `python3 worklog.py add 2026-11-24 "0.5h - admin: Team standup"` |
+| View a day with line numbers | `python3 worklog.py view 2026-11-24` |
+| Change hours or text of line 2 | `python3 worklog.py set 2026-11-24 2 --hours 1.5 --text "admin: Sprint planning"` |
+| Remove line 2 | `python3 worklog.py rm 2026-11-24 2` |
+| Make a day add up to 8h | `python3 worklog.py fit 2026-11-24` |
+| Delete or rebuild a day | `python3 worklog.py delete 2026-11-24` / `rebuild 2026-11-24` |
 | Fill older days | `python3 worklog.py backfill --since 2026-11-01` |
 | Remove the hooks | `python3 worklog.py uninstall` |
 | Check the Cursor reader | `python3 worklog.py doctor cursor` |
@@ -93,7 +98,7 @@ Cursor keeps chats in a SQLite file that is not documented and changes between v
 | POST | `/api/day/YYYY-MM-DD/rebuild` | Build the day again from sessions |
 | GET | `/api/export?from=&to=&format=md\|csv\|json` | Export a range |
 
-Full guide with examples: [`skills/worklog-api/SKILL.md`](skills/worklog-api/SKILL.md).
+The API is only for the web page and other programs. AI agents use the CLI only (no server needed); see [`skills/worklog/SKILL.md`](skills/worklog/SKILL.md).
 
 ## Rules it follows
 

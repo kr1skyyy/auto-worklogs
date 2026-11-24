@@ -9,6 +9,12 @@ Commands:
   show [N]              print the last N saved logs (default 5)
   week [DATE]           print the logs of one week (Mon-Sun) with the total hours
   add DATE "2h - text"  add a manual line to a day; it stays when the day is rebuilt
+  view DATE [--json]    show one day with numbered lines
+  set DATE N [--hours H] [--text "project: what"]   change line N of a day
+  rm DATE N             remove line N of a day
+  fit DATE [HOURS]      scale a day's hours so they add up to HOURS (default: target_hours)
+  delete DATE           delete a day's log (automatic runs will not bring it back)
+  rebuild DATE          build a day again from the sessions (replaces your changes)
   path [DATE]           print the folder of the logs, or the file of one day
   serve [--port N]      open a small local web page to view and edit the logs (127.0.0.1 only)
   export [--week DATE | --from DATE --to DATE] [--format md|csv|json] [--out FILE]
@@ -927,7 +933,8 @@ def cmd_install_codex(cfg, remove=False):
         shutil.rmtree(skill_dir, ignore_errors=True)
         shutil.rmtree(skill_dir.parent / "auto-worklog-api", ignore_errors=True)
     else:
-        for name, target in (("worklog", skill_dir), ("worklog-api", skill_dir.parent / "auto-worklog-api")):
+        shutil.rmtree(skill_dir.parent / "auto-worklog-api", ignore_errors=True)  # merged into one skill
+        for name, target in (("worklog", skill_dir),):
             tpl = (SCRIPT.parent / "skills" / name / "SKILL.template.md").read_text(encoding="utf-8")
             target.mkdir(parents=True, exist_ok=True)
             (target / "SKILL.md").write_text(tpl.replace("__WORKLOG_PY__", f"`{SCRIPT}`"), encoding="utf-8")
@@ -1260,6 +1267,99 @@ def cmd_uninstall(cfg):
     print("Your logs and settings stay in place.")
 
 
+def save_day(day, entries, notes, cfg):
+    """Write a day's lines. The file then counts as edited by you: automatic runs leave it alone."""
+    p = out_path(day, cfg)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(render_entries(day, entries, notes, cfg), encoding="utf-8")
+    state = load_json(STATE_FILE, {})
+    state.setdefault(day.isoformat(), {}).pop("deleted", None)
+    save_json(STATE_FILE, state)
+
+
+def print_day(info, cfg):
+    target = float(cfg.get("target_hours", 8))
+    if not info["exists"]:
+        print(f"{info['weekday']} {info['label']}: no log.")
+        return
+    print(f"{info['weekday']} {info['label']}  total {fmt_h(info['total'])} of {fmt_h(target)}"
+          + ("  (edited by you)" if info["edited"] else ""))
+    for i, e in enumerate(info["entries"], 1):
+        print(f"  {i}. {fmt_h(e['hours']):>6}  {e['text']}")
+    for n in info["notes"]:
+        print(f"     {n}")
+
+
+def cmd_day_tools(cmd, args, pos, cfg, use_ai):
+    if not pos:
+        sys.exit(f"Use: {cmd} YYYY-MM-DD ...  (also: today, yesterday)")
+    day = parse_day(pos[0])
+    state = load_json(STATE_FILE, {})
+    info = day_info(day, cfg, state)
+    entries, notes = info["entries"], info["notes"]
+
+    def line_no():
+        if len(pos) < 2 or not pos[1].isdigit() or not 1 <= int(pos[1]) <= len(entries):
+            sys.exit(f"Give a line number from 1 to {len(entries)}. See: view {day}")
+        return int(pos[1]) - 1
+
+    def opt(name):
+        return args[args.index(name) + 1] if name in args and args.index(name) + 1 < len(args) else None
+
+    if cmd == "view":
+        if "--json" in args:
+            print(json.dumps(info, indent=2, ensure_ascii=False))
+        else:
+            print_day(info, cfg)
+        return
+    if cmd == "rebuild":
+        done = process(day, cfg, force=True, use_ai=use_ai, only=day)
+        if not done:
+            sys.exit(f"No sessions found for {day}.")
+    elif cmd == "delete":
+        p = out_path(day, cfg)
+        if p.exists():
+            p.unlink()
+        state.setdefault(day.isoformat(), {})["deleted"] = True
+        save_json(STATE_FILE, state)
+        print(f"Deleted the log of {day}.")
+        return
+    else:
+        if not info["exists"]:
+            sys.exit(f"{day} has no log. Use: add {day} \"1h - project: what you did\"")
+        if cmd == "set":
+            i = line_no()
+            hours, text = opt("--hours"), opt("--text")
+            if hours is None and text is None:
+                sys.exit('Use: set DATE N --hours 2.5 and/or --text "project: what you did"')
+            if hours is not None:
+                entries[i]["hours"] = max(0.0, float(hours.rstrip("hH").replace(",", ".")))
+            if text is not None:
+                entries[i]["text"] = text.strip()
+        elif cmd == "rm":
+            gone = entries.pop(line_no())
+            manual = state.get(day.isoformat(), {}).get("manual", [])
+            for m in list(manual):  # a removed "add" line must not come back on rebuild
+                mm = ENTRY_RE.match(m)
+                if mm and mm.group(2).strip() == gone["text"].strip():
+                    manual.remove(m)
+                    save_json(STATE_FILE, state)
+                    break
+        elif cmd == "fit":
+            target = float(pos[1]) if len(pos) > 1 else float(cfg.get("target_hours", 8))
+            total = sum(e["hours"] for e in entries)
+            if not total:
+                sys.exit("This day has no hours to scale.")
+            step = float(cfg.get("round_to_hours") or 0.25)
+            acc = 0.0
+            for e in entries[:-1]:
+                e["hours"] = round(e["hours"] * target / total / step) * step
+                acc += e["hours"]
+            entries[-1]["hours"] = max(0.0, round(target - acc, 2))
+        save_day(day, entries, notes, cfg)
+    print_day(day_info(day, cfg, load_json(STATE_FILE, {})), cfg)
+
+
 def main(argv):
     if not argv or argv[0] in ("-h", "--help", "help"):
         print(__doc__)
@@ -1330,6 +1430,8 @@ def main(argv):
             print(f"Saved {out}")
         else:
             print(text)
+    elif cmd in ("view", "set", "rm", "fit", "delete", "rebuild"):
+        cmd_day_tools(cmd, args, pos, cfg, use_ai)
     elif cmd == "serve":
         cmd_serve(args, cfg)
     elif cmd == "path":

@@ -1,45 +1,69 @@
 ---
 name: worklog
-description: View, build, add to or change the daily work log that auto-worklog makes from Claude Code, Codex and Cursor sessions. Use when the user asks about their work log, timesheet, what they did on a day or week, hours per project, or wants to add, fix, remove or rebuild a log entry.
+description: View, change, add, remove, rebuild or export the daily work log that auto-worklog makes from Claude Code, Codex and Cursor sessions. Use when the user asks about their work log, timesheet, hours, what they did on a day or week, or wants to change hours, add, edit or delete an entry, rebuild a day, or export for Jira.
 ---
 
 # auto-worklog
 
-Daily logs live in one folder (default `~/worklog/`), one file per workday, named `YYYY-MM-DD.md`:
+One log file per workday (default folder `~/worklog/`, file `YYYY-MM-DD.md`):
 
 ```
 24.11.2026
- 4h - shop-migration: Mapped Magento product attributes to Shopify metafields
+ 2.25h - shop-migration: Built the admin dashboard with run, pause and logs
  1.5h - mobile-app: Planned the next onboarding steps
 ```
 
-The script is `worklog.py`. WORKLOG_PY below means: __WORKLOG_PY__
-Run it with `python3` (on Windows: `python`).
+Use only these CLI commands. They need no server. WORKLOG_PY means: __WORKLOG_PY__
+Run it with `python3` (on Windows: `python`). Dates: `YYYY-MM-DD`, `today` or `yesterday`.
 
-## Commands
+## View
 
 | Goal | Command |
 |---|---|
-| Show recent days | `python3 WORKLOG_PY show 5` |
-| Show a week + total hours | `python3 WORKLOG_PY week [YYYY-MM-DD]` |
-| Build a log now (today, yesterday or a date) | `python3 WORKLOG_PY day today` (add `--dry-run` to only print) |
-| Fill all missing days | `python3 WORKLOG_PY backfill --since YYYY-MM-DD` |
-| Add a manual line | `python3 WORKLOG_PY add YYYY-MM-DD "2h - Client call about launch"` |
-| File of a day / log folder | `python3 WORKLOG_PY path [YYYY-MM-DD]` |
-| Web page to view and edit (127.0.0.1 only) | `python3 WORKLOG_PY serve` (runs until stopped; start it in the background) |
+| One day, numbered lines | `python3 WORKLOG_PY view 2026-11-24` (`--json` for data) |
+| Last N days | `python3 WORKLOG_PY show 5` |
+| A week + total | `python3 WORKLOG_PY week [DATE]` |
+
+## Change
+
+Always run `view DATE` first to get the line numbers.
+
+| Goal | Command |
+|---|---|
+| Change hours of line N | `python3 WORKLOG_PY set DATE N --hours 2.5` |
+| Change text of line N | `python3 WORKLOG_PY set DATE N --text "project: what was done"` |
+| Add a line | `python3 WORKLOG_PY add DATE "1h - project: what was done"` |
+| Remove line N | `python3 WORKLOG_PY rm DATE N` |
+| Make the day add up to 8h (or X) | `python3 WORKLOG_PY fit DATE [X]` |
+| Delete the whole day | `python3 WORKLOG_PY delete DATE` |
+| Build the day again from sessions | `python3 WORKLOG_PY rebuild DATE` (AI call, 10–60 s) |
+| Build a missing day / fill a range | `python3 WORKLOG_PY day DATE` / `backfill --since DATE` |
+
+Every change command prints the day again: show that to the user.
+
+To move time between lines, use two `set` commands (lower one, raise the other).
+
+## Rules
+
+- A day changed with these commands counts as **edited by you**: the automatic run never overwrites it.
+- `rebuild` and `day` **replace** the user's changes, and `delete` removes the day. Ask the user before you run them on a day that has lines.
+- Lines added with `add` are kept when a day is rebuilt.
+- Text format: `project: what was done`, 6 to 16 words, past tense. Keep the user's words when they give them.
+
+## Export (for Jira and reports)
+
+`python3 WORKLOG_PY export --week DATE` or `export --from DATE --to DATE`; `--format md|csv|json`; `--out file.md` to save.
+
+## Web page for the user
+
+If the user wants to see the logs in a browser: run `python3 WORKLOG_PY serve` in the background (it runs until stopped) and give them http://127.0.0.1:8765. Do not use the page yourself: use the commands above.
+
+## Setup and settings
+
+| Goal | Command |
+|---|---|
 | Choose tools | `python3 WORKLOG_PY install --tools claude,codex,cursor` (or `both`, `all`) |
 | Check the Cursor reader (supported, not tested) | `python3 WORKLOG_PY doctor cursor` |
-| Settings | `python3 WORKLOG_PY config` |
+| Settings | `python3 WORKLOG_PY config` (file: `~/.auto-worklog/config.json`, holds only the user's changes) |
 
-## Changing a log
-
-- To change or remove a line, edit the day's file directly (get it with `path DATE`).
-- A file edited by hand is protected: the automatic run never overwrites it.
-- `day DATE` rebuilds the day from the sessions and **replaces hand edits**. Ask the user before you run it on a day that already has a file.
-- Lines added with `add` are kept when a day is rebuilt.
-- Keep the format: first line is the date, then one line per entry: ` <hours>h - <project>: <what was done>`.
-
-## Settings
-
-The config file is `~/.auto-worklog/config.json` (`config` prints it). Keys: `workdays` (0=Mon..6=Sun), `day_end` (`"19:00"`), `weekend` (`"ignore"` or `"monday"`), `output_dir`, `date_format`, `summarizer` (`auto|claude|codex|none`), `claude_model`, `idle_minutes`, `min_minutes`, `min_task_minutes` (15), `round_to_hours` (0.25 = round up to quarter hours, 0 = exact), `target_hours` (8), `port`, `sources` (claude, codex, cursor), `cursor_app_dir`, `exclude_projects`.
-Background run messages go to `~/.auto-worklog/log.txt`.
+Keys: `workdays` (0=Mon..6=Sun), `day_end` ("19:00"), `weekend` ("ignore" or "monday"), `target_hours` (8), `round_to_hours` (0.25), `min_task_minutes` (15), `idle_minutes`, `output_dir`, `date_format`, `summarizer` (auto|claude|codex|cursor|none), `claude_model`, `sources` (claude, codex, cursor), `exclude_projects`. Background messages: `~/.auto-worklog/log.txt`.

@@ -1,6 +1,6 @@
 ---
 description: View or change your daily work log (show, week, today, add, backfill)
-argument-hint: "[show|week|today|day DATE|add DATE \"2h - text\"|backfill --since DATE]"
+argument-hint: "[show|week|view DATE|set|add|rm|fit|delete|rebuild|export|web|setup]"
 ---
 
 Use the `worklog` skill. The user asked: `/worklog $ARGUMENTS`
